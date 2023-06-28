@@ -33,6 +33,7 @@ The cost of each spin is 5 tokens. The payout rates for different win patterns a
 2. **style.css**: This file contains all the styling required for the game.
 3. **game.php**: This is the backend of the game. It handles the game logic, including determining wins and calculating payouts.
 4. **ajax.js**: This file handles the front-end JavaScript, including the Fetch API call to the game.php script and updating the front-end according to the response.
+5. **sim.php**: This is a stand-alone file designed to simulate a specific number of spins and outputs the statistics of win occurrences and payouts for each type of win.
 
 # DISCLAIMER:
 
