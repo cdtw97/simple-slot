@@ -37,17 +37,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Add the payout to the total tokens
         $_SESSION['tokens'] = $_SESSION['tokens'] + $payout['totalPayout'];
-        
+
+
+        $matrix_renewed = array();
+
+        for ($reel = 0; $reel < 6; $reel++) {
+            for ($row = 0; $row < 3; $row++) {
+                $matrix_renewed['reel' . ($reel + 1)][$row] = $matrix3x6[$row][$reel];
+            }
+        }
+      
         // Prepare the result array
         $result = array(
-            'matrix' => $matrix3x6,             // The 3x6 matrix from the spin
+            'matrix' => $matrix_renewed,             // The 3x6 matrix from the spin
             'lineWins' => $lineWins,            // Line win results
             'diagonalWins' => $diagonalWins,    // Diagonal win results
             'cornerWins' => $fourCornerWins,    // Four corner win results
             'tokens' => $_SESSION['tokens'],    // Remaining token count after the spin
             'payout' => $payout                 // Details of the payout
         );
-
+        //dump_die($result);
+        //dump_die($result);
+       //dump_die($result);
         // Return the result as JSON
         echo json_encode($result);
                 
@@ -183,8 +194,7 @@ function checkFourCorners($rows) {
 }
 function calculatePayout($lineWins, $diagonalWins, $fourCornerWins, $costPerSpin) {
     // Define the payouts for different win types and lengths
-    $payouts = [2 => 0.75215, 3 => 0.72, 4 => 1.02, 5 => 1.28, 6 => 10, 'diagonal' => 0.72, 'four_corner' => 0.72];
-
+    $payouts = [2 => 0.63, 3 => 1.08, 4 => 1.18, 5 => 1.28, 6 => 10, 'diagonal' => 1.08, 'four_corner' => 1.18];
     // Initialize the total payout and payout details
     $totalPayout = 0;
     $payoutDetails = [];
