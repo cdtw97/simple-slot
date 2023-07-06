@@ -1,40 +1,30 @@
-#slot-machine {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 600px;
-}
+.reel-container {
+    width: 80px; /* Increased from 60px to 70px */
+    height: 180px;
+      
+    overflow: hidden;
+   padding-top:10px;
+    margin:10px;
 
-.row {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
 }
 
 .reel {
-    width: 100px;
-    height: 100px;
-    border: 1px solid black;
-    overflow: hidden; 
+    list-style: none;
+    padding: 0;
+    margin: 0;
     position: relative;
-    text-align: center;
 }
 
-.reel-container {
-    position: relative;
-    width: 100%; 
-    height: auto; 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-}
-
-.symbol {
-    height: 100px;
-    line-height: 100px;
+.reel li {
+    font-size: 50px;
+    height: 60px;
+    line-height: 60px;
     text-align: center;
-    width: 100%;
-    box-sizing: border-box;
+}
+#slot-machine{
+    border: 1px solid #000;
+    margin-top:10px;
+}
+.highlight {
+    border: 2px solid green;
 }
