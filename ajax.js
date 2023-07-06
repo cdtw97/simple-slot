@@ -1,69 +1,128 @@
-function displaySymbols(matrix) {
-    // Loop over each row in the matrix
-    for (let row = 0; row < matrix.length; row++) {
-        // Loop over each column in the row
-        for (let col = 0; col < matrix[row].length; col++) {
-            // Compute the unique ID for each reel using row and column indices
-            let reelId = 'reel' + ((row * matrix[row].length) + col + 1);
-            // Retrieve the HTML element with this unique ID
-            let reelElement = document.getElementById(reelId);
-            // If the element exists, update its text content with the matrix symbol
-            if (reelElement) {
-                reelElement.textContent = matrix[row][col];
-            }
-        }
-    }
-}
+// Symbols
+const symbols = ['🍎', '🍊', '🍋', '🍉', '🍇', '🍒', '🍐', '🍍', '🥥', '🥝', '🍓'];
 
-function displayPayouts(payoutDetails) {
-    // Get the payouts table HTML element
-    let table = document.getElementById('payouts-table');
-    // Clear the table contents
-    table.innerHTML = "";
-
-    // Loop over each payout detail
-    for(let payout of payoutDetails) {
-        // Create a new row in the table
-        let row = table.insertRow(-1);
-        // Insert new cells in the row
-        let typeCell = row.insertCell(0);
-        let symbolCell = row.insertCell(1);
-        let lengthCell = row.insertCell(2);
-        let payoutCell = row.insertCell(3);
-
-        // Fill the cells with respective payout details
-        typeCell.textContent = payout.type;
-        symbolCell.textContent = payout.symbol;
-        lengthCell.textContent = payout.length;
-        payoutCell.textContent = payout.payout.toFixed(2);  // Format the payout to 2 decimal places
-    }
-}
-
-// Event listener for the 'click' event on the spin button
 document.getElementById('spin-button').addEventListener('click', function() {
-    // Make a POST request to the 'game.php' file
     fetch('game.php', {
         method: 'POST'
     })
-    .then(response => response.json())  // Parse the response as JSON
+    .then(response => response.json())
     .then(data => {
-        // Extract total payout from the data and display it
-        let totalPayout = data.payout.totalPayout;
-        document.getElementById('total-payout').textContent = "Total Payout: " + totalPayout.toFixed(2);
-
-        // Display payout details
-        displayPayouts(data.payout.payoutDetails);
-
-        // Update the token counter
-        let tokens = data.tokens;
-        document.getElementById('token-counter').textContent = "Tokens: " + tokens;
-
-        // Display the slot machine symbols
+        clearHighlighting()
+        console.log(data);
         let matrix = data.matrix;
-        displaySymbols(matrix);
+        let index = 0;
+
+        for (let reel in matrix) {
+            let ul = document.getElementById(reel).querySelector('.reel');
+
+            ul.innerHTML = "";
+
+            let extendedArray = [];
+            for (let i = 0; i < 20; i++) {
+                extendedArray.push(symbols[Math.floor(Math.random()*symbols.length)]);
+            }
+            extendedArray = [...extendedArray, ...matrix[reel]];
+
+            extendedArray.forEach(symbol => {
+                let li = document.createElement('li');
+                li.innerText = symbol;
+                ul.appendChild(li);
+            });
+
+            // Set initial position of reel to simulate spinning from somewhere in the middle
+            gsap.set(ul, {y: -61.2 * 10}); // start from the 10th symbol of the extended array
+
+            // Animate the reel
+            gsap.to(ul, {
+                y: -61.2 * 20 + 10, // Stop at the 20th symbol (end of random symbols) and adjust ending position
+                duration: 1 + 0.2 * index, // Add to duration based on reel index
+                ease: "power1.out",
+                onComplete: () => {
+                  
+                        console.log('hi');
+                        highlightWinningSymbols(data.lineWins);
+                    
+                        displayPayoutDetails(data.payout.payoutDetails);
+                        updateTokenAmount(data.tokens);
+                    
+                }
+            });
+
+            index++;
+        }
     })
     .catch((error) => {
-        // Log any errors to the console
         console.error('Error:', error);
     });
 });
+
+function displayPayoutDetails(payoutDetails) {
+    const payoutElement = document.getElementById('winning-lines');
+    payoutElement.innerHTML = "";
+
+    if (payoutDetails.length === 0) {
+      const li = document.createElement('li');
+      li.classList.add('list-group-item');
+      li.innerText = "No payouts";
+      payoutElement.appendChild(li);
+    } else {
+      payoutDetails.forEach(payout => {
+        const li = document.createElement('li');
+        li.classList.add('list-group-item');
+        li.innerText = `Type: ${payout.type}, Symbol: ${payout.symbol}, Length: ${payout.length}, Payout: ${payout.payout}`;
+        payoutElement.appendChild(li);
+      });
+    }
+}
+  
+  function updateTokenAmount(tokens) {
+    const tokenAmount = document.getElementById('token-amount');
+    tokenAmount.innerText = tokens.toFixed(2);
+  }
+
+  function highlightWinningSymbols(lineWins) {
+    lineWins.forEach(line => {
+        for (let reel = line.start; reel <= line.end; reel++) {
+            let ul = document.getElementById(`reel${reel + 1}`).querySelector('.reel');
+            let winningSymbol = ul.children[ul.children.length - 3 + line.row];
+            winningSymbol.classList.add('highlight');
+        }
+    });
+}
+
+function highlightDiagonalWins(diagonalWins) {
+  diagonalWins.forEach(win => {
+      // Figure out the direction of the diagonal
+      let isTopLeftToBottomRight = (win.start[0] < win.end[0] && win.start[1] < win.end[1]);
+      
+      for (let reel = 0; reel < 6; reel++) {
+          let ul = document.getElementById(`reel${reel + 1}`).querySelector('.reel');
+          // Use the 'isTopLeftToBottomRight' variable to decide which symbol to highlight
+          let position = isTopLeftToBottomRight ? reel : 2 - reel;
+          let winningSymbol = ul.children[ul.children.length - 3 + position];
+          winningSymbol.classList.add('highlight');
+      }
+  });
+}
+
+function highlightCornerWins(cornerWins) {
+  if(cornerWins.length > 0) {
+      let reels = ["reel1", "reel6"];
+      let positions = [0, 2];
+
+      reels.forEach(reel => {
+          positions.forEach(position => {
+              let ul = document.getElementById(reel).querySelector('.reel');
+              let winningSymbol = ul.children[ul.children.length - 3 + position];
+              winningSymbol.classList.add('highlight');
+          });
+      });
+  }
+}
+function clearHighlighting() {
+  let highlightedSymbols = document.querySelectorAll('.highlight');
+  highlightedSymbols.forEach(symbol => symbol.classList.remove('highlight'));
+}
+
+
+
