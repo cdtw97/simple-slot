@@ -2,10 +2,11 @@
 declare(strict_types=1);
 require_once __DIR__ . '/GameState.php';
 require_once __DIR__ . '/Collection.php';
+require_once __DIR__ . '/Daily.php';
 
 final class Repository
 {
-    public function __construct(private PDO $db) {}
+    public function __construct(private PDO $db, private ?DateTimeImmutable $instant = null) {}
 
     public static function connect(): PDO
     {
@@ -56,6 +57,7 @@ final class Repository
             'id' => $game['id'], 'mode' => $game['mode'], 'machine' => 'fruit-arcade',
             'rulesVersion' => $game['rulesVersion'], 'scoreUnits' => $game['scoreUnits'],
             'dailyDate' => $date ?: null, 'official' => $official,
+            'completedAt' => ($this->instant ?? new DateTimeImmutable())->setTimezone(new DateTimeZone('UTC'))->format(DATE_ATOM),
             'previousBestUnits' => $best !== null ? (int)$best : null,
         ];
         if ($official) {
@@ -65,7 +67,43 @@ final class Repository
         }
     }
 
-    private function act(int $id, array &$state, array &$profile, array $input): void
+    private function dailyAvailable(int $id, string $date): bool
+    {
+        return !$this->query('SELECT run_id FROM slot_daily_attempts WHERE guest_id=? AND daily_key=?',
+            [$id, $date])->fetchColumn();
+    }
+
+    private function dailyAction(int $id, array &$state, array $input, string $today): void
+    {
+        $action = $input['action'];
+        if ($action === 'start_run') {
+            $this->query('INSERT INTO slot_daily_definitions (daily_key,rules_version,seed_hex) VALUES (?,?,?)
+                ON DUPLICATE KEY UPDATE daily_key=VALUES(daily_key)', [$today, Rules::CURRENT, bin2hex(random_bytes(32))]);
+            $version = $this->query('SELECT rules_version FROM slot_daily_definitions WHERE daily_key=? FOR UPDATE', [$today])->fetchColumn();
+            Challenge::start($state, Rules::get($version));
+            $state['dailyDate'] = $today;
+            $state['official'] = $this->dailyAvailable($id, $today);
+            if ($state['official']) {
+                // The guest lock serializes same-guest starts. The primary key protects
+                // the reservation even when the run is abandoned or the server restarts.
+                $this->query('INSERT INTO slot_daily_attempts (guest_id,daily_key,run_id) VALUES (?,?,?)',
+                    [$id, $today, $state['id']]);
+            }
+            return;
+        }
+        $rules = Rules::get($state['rulesVersion']);
+        $draw = null;
+        if (isset($state['dailyDate']) && in_array($action, ['spin','advance_bonus','respin'], true)) {
+            $seed = $this->query('SELECT seed_hex FROM slot_daily_definitions WHERE daily_key=?', [$state['dailyDate']])->fetchColumn();
+            if (!$seed) {
+                throw new RuntimeException('Missing pinned daily definition.');
+            }
+            $draw = Daily::stream($state, $rules, $action, $input, $seed);
+        }
+        Challenge::act($state, $action, $input, $rules, $draw);
+    }
+
+    private function act(int $id, array &$state, array &$profile, array $input, string $today): void
     {
         $action = $input['action'];
         if ($action === 'equip') {
@@ -79,6 +117,8 @@ final class Repository
                 $state['rulesVersion'] = Rules::CURRENT;
             }
             GameState::act($state, $action, $input, Rules::get($state['rulesVersion']));
+        } elseif ($state['mode'] === 'daily') {
+            $this->dailyAction($id, $state, $input, $today);
         } else {
             $version = $action === 'start_run' ? Rules::CURRENT : $state['rulesVersion'];
             Challenge::act($state, $action, $input, Rules::get($version));
@@ -105,6 +145,7 @@ final class Repository
                 throw new GameError('unknown_guest', 'Reconnect to load your guest save.', 403);
             }
             $id = (int)$guest['id'];
+            $daily = Daily::calendar($this->instant);
             $profile = $this->profile($id, $guest['profile_json']);
             if ($legacyWallet !== null && $mode !== 'free') {
                 $this->query("INSERT INTO slot_games (guest_id,mode,state_json) VALUES (?,'free',?)
@@ -130,7 +171,7 @@ final class Repository
                     if ($state['revision'] !== $input['expectedRevision']) {
                         throw new GameError('stale_revision', 'This game changed in another tab. Reload its latest result.');
                     }
-                    $this->act($id, $state, $profile, $input);
+                    $this->act($id, $state, $profile, $input, $daily['date']);
                     $state['revision']++;
                     $this->query('UPDATE slot_guests SET profile_json=? WHERE id=?', [json_encode($profile, JSON_THROW_ON_ERROR), $id]);
                     $this->query('INSERT INTO slot_actions (guest_id,action_id,payload_hash,receipt_json) VALUES (?,?,?,?)',
@@ -141,8 +182,9 @@ final class Repository
                 $this->query('INSERT INTO slot_games (guest_id,mode,state_json) VALUES (?,?,?)
                     ON DUPLICATE KEY UPDATE state_json=VALUES(state_json)', [$id, $mode, json_encode($state, JSON_THROW_ON_ERROR)]);
             }
+            $daily['officialAvailable'] = $this->dailyAvailable($id, $daily['date']);
             $this->db->commit();
-            return ['state' => $state, 'profile' => Collection::view($profile), 'daily' => null, 'replayed' => $replayed];
+            return ['state' => $state, 'profile' => Collection::view($profile), 'daily' => $daily, 'replayed' => $replayed];
         } catch (Throwable $e) {
             $this->db->rollBack();
             throw $e;

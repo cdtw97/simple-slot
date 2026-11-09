@@ -27,6 +27,20 @@ function percentiles(array $histogram): array
     return $out;
 }
 
+/** Counts by return size, including zero, with boundaries in the active rules. */
+function awardSizes(array $histogram, array $rules): array
+{
+    $bins = ['zero'=>0, 'belowStake'=>0, 'stakeToBelowLargeWin'=>0, 'largeWinOrHigher'=>0];
+    foreach ($histogram as $units => $count) {
+        $bucket = match (true) {
+            $units === 0 => 'zero', $units < $rules['stakeUnits'] => 'belowStake',
+            $units < $rules['celebrations']['largeWinUnits'] => 'stakeToBelowLargeWin', default => 'largeWinOrHigher',
+        };
+        $bins[$bucket] += $count;
+    }
+    return $bins;
+}
+
 function simulate(array $rules, int $count, string $seed): array
 {
     $normalDraw = Engine::stream($seed, 'free-play/normal');
@@ -85,6 +99,7 @@ function simulate(array $rules, int $count, string $seed): array
         'spentUnits'=>$count * $rules['stakeUnits'], 'normalAwardUnits'=>$baseTotal, 'bonusAwardUnits'=>$bonusTotal,
         'grossReturnPctOfNormalStakes'=>100 * ($baseTotal + $bonusTotal) / ($count * $rules['stakeUnits']),
         'bonusShareOfTotalAwardsPct'=>($baseTotal + $bonusTotal) ? 100 * $bonusTotal / ($baseTotal + $bonusTotal) : 0,
+        'normalAwardSizeCounts'=>awardSizes($normalSizes, $rules), 'bonusAwardSizeCounts'=>awardSizes($bonusSizes, $rules),
         'normalAwardUnitsPercentiles'=>percentiles($normalSizes), 'bonusAwardUnitsPercentiles'=>percentiles($bonusSizes),
         'cornerRushActivations'=>$activations,
         'meanNormalSpinsPerCompletedMeter'=>$activations ? $previous / $activations : null,

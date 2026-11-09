@@ -1366,3 +1366,39 @@ dialog p {
         font-size: 0.82rem;
     }
 }
+.share-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 7px;
+    margin: 7px 0 12px;
+}
+.share-actions {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+.share-status {
+    color: var(--muted);
+    min-height: 1.3em;
+}
+.share-text {
+    width: 100%;
+    min-height: 100px;
+    margin-top: 8px;
+}
+.daily-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 13px;
+    align-items: center;
+    font-size: 0.8rem;
+    margin: 7px 0;
+    color: var(--muted);
+}
+.daily-info strong {
+    color: var(--ink);
+}
+.scorecard #share-card {
+    margin-top: 7px;
+}

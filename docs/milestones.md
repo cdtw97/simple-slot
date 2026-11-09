@@ -62,3 +62,28 @@ Ran `node tests/browser.mjs http://127.0.0.1:8766/simple-slot/` with Playwright 
 The desktop (1440×960), narrow phone (320×740), landscape (844×390) and tablet (768×1024) checks each displayed all 18 symbols in six aligned columns. The narrow view initially cropped the third row. Explicit grid track sizing fixed it and all four sizes passed on rerun. The browser used emulated touch. Desktop and phone screenshots received a visual check; physical iOS/Android hardware was not exercised.
 
 Dialog use, keyboard spin, repeated taps during a slow request, rotation while spinning and reveal produced exactly one action. The visible wallet, paid cells and restored result matched the server. A dropped response after a committed spin, followed by another tab's spin and a retry, kept the newer result and wallet. A stale request explained the other-tab update and recovered the current board.
+
+## Release 2 · Score Attack and collections
+
+The new fruit tiers and wild rules use `fruit-v2`. Free Play and the new finite runs share evaluation while keeping their own balances, scores and lamps. The scorecard compares records from the same machine, mode and rules version. Settled achievements unlock cabinet palettes.
+
+- `node tests/challenges.mjs <test-api> score-only` completed all 30 normal spins with a respin on the first and final board. It checked the unchanged five reels, exact pending-board reload, idempotent keep/respin, all card metrics against independent totals, locked/equipped palettes and Free Play wallet isolation. The case passed again after `fruit-v2` became current.
+- `php tests/challenge-boundaries.php` supplied a four-corner board as the final pending choice. Accepting it queued three double-payout bonus spins. The scorecard and completed-run achievement appeared only after the third. Unused charges and lamps expired.
+- `node tests/browser-runs.mjs <test-game-url>` played a complete run through the cabinet in Chrome. It switched modes and refreshed a pending choice, selected a reel, played earned bonuses, checked the completed scorecard at 320px and 1440px, equipped Plum, reloaded, began a new run and tested both Resume and Abandon. The selected palette survived.
+
+## Release 3 · Daily Challenge and sharing
+
+- `node tests/challenges.mjs <test-api> all <second-worker-api>` raced two independent PHP workers for one guest's official daily reservation. Abandoning the winner led to a Practice start. Three other guests completed the shared daily. Two followed identical choices through their normal, respin and bonus boards. The third spent charges on different spins and still drew the same subsequent normal boards.
+- With `SIMPLE_SLOT_CONFIG` pointing to the dedicated QA database, `php tests/daily-boundaries.php --database=simple_slot_qa` checked the 23- and 25-hour Toronto dates. It played an official run across midnight on the fall-back weekend with a server-side test clock. The stored board, date and rules survived. A new official day and its same-choice practice produced equal scores. The database retained exactly two official records across the three finished runs.
+- `node tests/browser-sharing.mjs <test-game-url>` exercised the Daily countdown and fresh Official/Practice runs on an emulated phone. Their completed scorecards downloaded as separately labeled 1000×608 PNGs. The browser exposed selected result text when clipboard access failed. A simulated native share receiver obtained the same text and PNG bytes as the download.
+- `node tests/browser.mjs <test-game-url>` also exercised hide/resume events during a moving reel. Another tab played while backgrounded. Returning refreshed the wallet without an extra spend. The lifecycle events were emulated in headless Chrome.
+
+The three browser suites (`browser.mjs`, `browser-runs.mjs` and `browser-sharing.mjs`) also passed together against a fresh install extracted from the Release 3 ZIP, using its minified assets and a new database created from its migrations. The test served the archive's public directory at `http://127.0.0.1:8769/public/`, verifying the packaged game under a subdirectory.
+
+## Install and upgrade checks
+
+- A seeded legacy PHP session with 9,876.54 credits imported as 987,654 units and survived refresh. A real guest save captured at a Release 1 bonus boundary retained its wallet and three remaining spins after the rules upgrade. All three free spins used `fruit-v1`. Its next paid spin used `fruit-v2`.
+- An installation of the Release 2 checkpoint (`ca33a7f`) played Free Play and saved a provisional Score Attack board. Applying only migration 003 and switching to the Release 3 package preserved both full states and the collection. Choosing Keep awarded exactly the earlier preview; the same guest could also start an official daily.
+- A separate empty MariaDB database accepted the three SQL files supplied in the ZIP. The archive contains 29 allowlisted files. Two builds produced SHA-256 `6990084ec80a1a8faa2738844d287bf03a38d5dd9c49775df0ed68cb57f1264d`.
+
+The Release 1 cabinet and rules are preserved at `48f13b0` and in `dist/simple-slot-release-1.zip`. The Release 2 checkpoint is `ca33a7f`. Release 3 is in `dist/simple-slot-release-3.zip`. All runtime checks used local servers. Public hosting, accounts, standings, installability and expansion machines remain outside this release.

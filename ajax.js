@@ -5,7 +5,7 @@ import { results, help, paytable } from './ui/results.js';
 import { modeNames, runControls, collections } from './ui/runs.js';
 
 const requestedMode = new URL(location.href).searchParams.get('mode');
-let mode = requestedMode === 'score' ? requestedMode : 'free';
+let mode = ['score', 'daily'].includes(requestedMode) ? requestedMode : 'free';
 byId('mode').value = mode;
 let game = null;
 let phase = 'loading';
@@ -20,6 +20,14 @@ function primary() {
     if (phase === 'sending') return ['One moment', null, 'Saving your action'];
     if (phase === 'failed')
         return ['Retry', 'retry', retained ? 'Recover this action' : 'Reconnect to your save'];
+    if (s?.mode === 'daily' && ['not_started', 'run_complete'].includes(s.phase))
+        return [
+            game.daily.officialAvailable ? 'Start daily' : 'Play practice',
+            'start_run',
+            game.daily.officialAvailable
+                ? 'Official attempt · ' + game.daily.date
+                : 'Practice · ' + game.daily.date,
+        ];
     if (s?.phase === 'not_started')
         return ['Start run', 'start_run', game.rules.runLength + ' normal spins'];
     if (s?.phase === 'run_complete') return ['Play again', 'start_run', 'Start a fresh run'];
@@ -38,7 +46,9 @@ function primary() {
         'Spin',
         'spin',
         s?.mode === 'free'
-            ? money(nextRules.stakeUnits) + ' credits per spin' + (game.nextRules ? ' · New paytable ' + nextRules.version : '')
+            ? money(nextRules.stakeUnits) +
+              ' credits per spin' +
+              (game.nextRules ? ' · New paytable ' + nextRules.version : '')
             : 'Normal spin ' + (s.normalUsed + 1) + ' of ' + game.rules.runLength,
     ];
 }
@@ -62,7 +72,11 @@ function present(data, announce = false) {
     const s = game.state;
     displayReels(s.board, s.lamps, s.pending?.awards || s.result?.awards || []);
     results(s, game.rules, announce);
-    runControls(game, mutate);
+    runControls(game, mutate, () => {
+        if (phase !== 'ready' || document.hidden || byId('dialog').open) return false;
+        load();
+        return true;
+    });
 }
 async function request(payload = null) {
     const controller = new AbortController();
@@ -84,6 +98,7 @@ async function request(payload = null) {
             throw e;
         }
         if (!data.state || !data.rules || !data.csrf) throw new Error('Incomplete game response.');
+        data.receivedAt = performance.now();
         return data;
     } finally {
         clearTimeout(timeout);

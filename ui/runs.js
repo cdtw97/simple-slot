@@ -1,4 +1,5 @@
 import { byId, element, art, money, signed, dialog } from './view.js';
+import { shareCard } from './share.js';
 
 export const modeNames = { free: 'Free Play', score: 'Score Attack', daily: 'Daily Challenge' };
 const paletteSwatches = {
@@ -8,6 +9,34 @@ const paletteSwatches = {
     plum: '#77506a',
     berry: '#a34c51',
 };
+
+let clockTimer;
+
+function dailyClock(game, onReset) {
+    const { daily, state } = game;
+    const group = element('div', 'daily-info');
+    const pinnedDate = state.dailyDate || daily.date;
+    const isActive = state.phase !== 'not_started';
+    const official = isActive ? state.official : daily.officialAvailable;
+    group.append(
+        element('strong', null, pinnedDate + ' · ' + (official ? 'Official attempt' : 'Practice')),
+    );
+    const time = element('span');
+    time.id = 'daily-countdown';
+    group.append(time);
+    const remaining = Date.parse(daily.resetAt) - Date.parse(daily.serverNow);
+    function tick() {
+        const seconds = Math.max(0, Math.ceil((remaining - (performance.now() - game.receivedAt)) / 1000));
+        const hours = String(Math.floor(seconds / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor(seconds / 60) % 60).padStart(2, '0');
+        const secs = String(seconds % 60).padStart(2, '0');
+        time.textContent = 'Next daily in ' + hours + ':' + minutes + ':' + secs + ' · Midnight Toronto';
+        if (seconds === 0 && time.isConnected && onReset()) clearInterval(clockTimer);
+    }
+    tick();
+    clockTimer = setInterval(() => (time.isConnected ? tick() : clearInterval(clockTimer)), 1000);
+    return group;
+}
 
 function button(label, callback) {
     const el = element('button', 'basic', label);
@@ -34,7 +63,15 @@ function recordCard(record, profile) {
         element('span', null, 'final score'),
     );
     section.append(scoreLine);
-    if (record.previousBestUnits === null || record.previousBestUnits === undefined) {
+    if (record.mode === 'daily' && !record.official) {
+        section.append(
+            element(
+                'p',
+                null,
+                'Practice score. Only your first attempt counts toward the official daily record.',
+            ),
+        );
+    } else if (record.previousBestUnits === null || record.previousBestUnits === undefined) {
         section.append(element('p', null, 'Your first completed score under these rules.'));
     } else {
         const delta = record.scoreUnits - record.previousBestUnits;
@@ -68,20 +105,27 @@ function recordCard(record, profile) {
             names.length ? 'Unlocked this run: ' + names.join(', ') : 'No new achievements this run.',
         ),
     );
+    const share = button('Share scorecard', () => shareCard(record));
+    share.id = 'share-card';
+    section.append(share);
     return section;
 }
-export function runControls(game, mutate) {
+export function runControls(game, mutate, onReset) {
+    clearInterval(clockTimer);
     const target = byId('mode-actions');
     target.replaceChildren();
     const { state: s, rules, profile } = game;
     if (s.mode === 'free') return;
     if (s.phase === 'run_complete' && s.record) {
-        target.append(recordCard(s.record, profile));
+        const card = recordCard(s.record, profile);
+        if (s.mode === 'daily') card.querySelector('.run-heading').after(dailyClock(game, onReset));
+        target.append(card);
         return;
     }
     const panel = element('section', 'run-panel');
     const head = header(modeNames[s.mode]);
     panel.append(head);
+    if (s.mode === 'daily') panel.append(dailyClock(game, onReset));
     if (s.phase === 'not_started') {
         panel.append(
             element(
@@ -94,6 +138,12 @@ export function runControls(game, mutate) {
                     ' charges to replace a reel before settling a normal board. Your Free Play credits stay separate.',
             ),
         );
+        if (s.mode === 'daily') {
+            const text = game.daily.officialAvailable
+                ? 'Starting reserves your official attempt. Later runs for this date are practice.'
+                : 'Your official attempt for this date has been used. You can still play for practice.';
+            panel.append(element('p', null, text));
+        }
     } else {
         const abandon = button('Abandon run', () => {
             const confirm = button('Abandon run', () => {
@@ -108,7 +158,8 @@ export function runControls(game, mutate) {
                 element(
                     'p',
                     null,
-                    'This ends the run without a completed score. Your earned achievements stay in your collection.',
+                    'This ends the run without a completed score. Your earned achievements stay in your collection.' +
+                        (s.mode === 'daily' && s.official ? ' Abandoning uses your official attempt.' : ''),
                 ),
                 actions,
             );

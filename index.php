@@ -35,7 +35,7 @@ function cabinetFruit(string $id): string {
         <h1>Simple Slot<span class="title-dot">.</span></h1>
         <p>Match fruit across six reels. Light all four corners for a bonus.</p>
     </div><label id="mode-control" class="mode-control"><span class="mode-dot"></span>
-        <select id="mode" aria-label="Game mode"><option value="free">Free Play</option><option value="score">Score Attack</option></select><?= icon('chevron') ?>
+        <select id="mode" aria-label="Game mode"><option value="free">Free Play</option><option value="score">Score Attack</option><option value="daily">Daily Challenge</option></select><?= icon('chevron') ?>
     </label></div>
     <p id="notice" class="notice" role="status" hidden></p>
     <div class="layout">

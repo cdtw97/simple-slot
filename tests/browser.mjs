@@ -149,9 +149,29 @@ try {
     await page.waitForFunction(() => /another tab/i.test(document.querySelector('#notice').innerText));
     assert.deepEqual(await getState(), unseen);
     assert.equal(Number((await wallet.innerText()).replace(/[^\d.]/g, '')), unseen.walletUnits / 100);
+    // Headless Chromium keeps every tab visible. Exercise the browser lifecycle events explicitly.
+    const beforeBackground = posts;
+    await button.click();
+    await page.locator('#spin-button[data-action=skip]').waitFor();
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', {value: true, configurable: true});
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.locator('#spin-button:is([data-action=spin],[data-action=advance_bonus])').waitFor();
+    const updatedDuringBackground = await otherTabSpin();
+    const refreshed = page.waitForResponse(response => response.request().method() === 'GET'
+        && response.url().split('?')[0] === api);
+    await page.evaluate(() => {
+        delete document.hidden;
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await refreshed;
+    await page.locator('#spin-button:is([data-action=spin],[data-action=advance_bonus])').waitFor();
+    assert.equal(posts, beforeBackground + 1, 'resuming requested a second spin');
+    assert.equal(Number((await wallet.innerText()).replace(/[^\d.]/g, '')), updatedDuringBackground.walletUnits / 100);
     assert.ok(initialButtonText.trim().length);
     assert.deepEqual(exceptions, []);
-    console.log('Passed desktop, 320px touch, landscape, tablet, alignment, dialogs, keyboard spin, slow requests, rotate/reveal, wallet, exact highlights, reload, lost-response retry, late receipt and stale-tab recovery in ' + await browser.version());
+    console.log('Passed desktop, 320px touch, landscape, tablet, alignment, dialogs, keyboard spin, slow requests, rotate/reveal, wallet, exact highlights, reload, lost-response retry, late receipt, stale-tab and emulated background/resume recovery in ' + await browser.version());
 } finally {
     await browser.close();
 }

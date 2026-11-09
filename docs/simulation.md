@@ -32,6 +32,8 @@ In this sample the meter filled in 18 normal spins at the median, 8 at the 10th 
 
 ## Repeatable draws
 
+Daily uses the private, per-date seed stored in MySQL. Its draw context is the JSON list `["simple-slot/daily/v1", Toronto date, rules version, draw type, normal spin number, ...]`. For `normal`, there are no further elements. For `respin`, the last element is the zero-based selected reel. For `bonus`, it is the one-based bonus ordinal within the triggering normal spin. Each context starts an independent stream. Neither guest identity nor run ID enters the address.
+
 Ordinary non-seeded gameplay uses PHP's `random_int`. For seeded draws, `Engine::stream` takes a seed and a context string. The input to HMAC-SHA256 is PHP's JSON encoding of the two-element list containing that context and an integer block counter starting at zero. Each digest supplies eight unsigned big-endian 32-bit words in order. Rejection sampling discards words in the incomplete top bucket before reducing modulo the sum of configured weights. Normal boards fill in row-major order and replacement reels fill top to bottom. Contexts must include the action-specific draw address when requesting independent boards.
 
 ## Tier and wild tuning

@@ -3,6 +3,7 @@ import {action, request, successful} from './api-client.mjs';
 
 const endpoint = process.argv[2] || 'http://127.0.0.1:8766/simple-slot/game.php';
 const includeDaily = process.argv[3] !== 'score-only';
+const secondWorker = process.argv[4] || endpoint;
 
 async function player(mode) {
     const jar = new Map();
@@ -113,6 +114,20 @@ assert.deepEqual(score.response.profile.achievements, finishedProfile.achievemen
 console.log('Passed all 30 Score Attack spins, pending refresh, two chosen reel respins, retry, wallet isolation, all scorecard metrics, locked/equipped palettes, progression and abandon.');
 
 if (includeDaily) {
+    const spare = await player('daily');
+    const attempts = await Promise.all([endpoint, secondWorker].map(worker =>
+        request(worker, new Map(spare.jar), action(spare.response, 'start_run'))));
+    const accepted = attempts.filter(response => response.status === 200);
+    assert.ok(accepted.length >= 1);
+    assert.ok(accepted.every(response => response.state.id === accepted[0].state.id && response.state.official));
+    assert.ok(attempts.every(response => response.status === 200 || response.error?.code === 'stale_revision'));
+    const reserved = await spare.read();
+    assert.equal(reserved.state.id, accepted[0].state.id);
+    const abandoned = await request(endpoint, spare.jar, action(reserved, 'abandon_run'));
+    assert.equal(successful(abandoned).record, null, 'unfinished official run got a record');
+    const practice = await request(endpoint, spare.jar, action(abandoned, 'start_run'));
+    assert.equal(successful(practice).official, false, 'abandoning an official attempt restored eligibility');
+
     const [a, b, c] = await Promise.all([player('daily'), player('daily'), player('daily')]);
     await Promise.all([a.step('start_run'), b.step('start_run'), c.step('start_run')]);
     assert.ok(a.state.official && b.state.official && c.state.official);

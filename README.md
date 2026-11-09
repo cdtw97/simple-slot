@@ -4,6 +4,8 @@ A six-reel fruit arcade for virtual credits. Play immediately as a guest. The ca
 
 ## Run the game
 
+For the release ZIP, follow the [installation, upgrade and rollback instructions](docs/deployment.md). The steps below run a source checkout.
+
 The verified local stack uses 64-bit PHP 8.2 with PDO MySQL and MariaDB 10.11 with InnoDB. A modern browser with JavaScript and first-party cookies is required. Production runs on PHP without Node or third-party runtime assets.
 
 1. Create an empty database, for example `simple_slot_arcade`, using utf8mb4. Import the SQL migrations from `migrations/` in filename order into that database.
@@ -26,6 +28,16 @@ Choose Score Attack in the mode selector and start a run. You get 30 normal spin
 
 Eight lifetime achievements unlock four cabinet palettes in addition to the starting Jade cabinet. The Collection shows conditions and progress. Equipping a palette affects the cabinet colours. A free refill or abandoned run retains settled achievements. Personal bests are compared within the same machine, mode and rules version.
 
+## Daily Challenge and scorecards
+
+Daily Challenge uses the same 30 spins and two respins. Everyone gets the same boards for the same choices on the same Toronto calendar date. Starting your first run reserves that day's official attempt, including if you abandon it. Later starts on the same date are Practice. You can finish yesterday's run after midnight and then start today's challenge. The cabinet shows the pinned run date and the time until the next reset.
+
+Only a completed official daily enters your personal daily records. A completed Score Attack, official daily or practice daily opens a shareable scorecard. Choose a PNG download, copy the result, or use the device share sheet when available. Practice cards carry a Practice label.
+
+## Releases
+
+Release 1 introduced the illustrated cabinet, durable guest saves and Corner Rush on the original equal-weight paytable. Release 2 added tiered fruit values, a wild, Score Attack and palettes. Release 3 adds Daily Challenge and share cards. The source repository includes first- and third-release ZIPs in `dist/`. Accounts, public leaderboards, installability and additional machines are deferred.
+
 ## Verification
 
 Run from the source directory:
@@ -34,9 +46,11 @@ Run from the source directory:
 php tests/engine.php
 php tests/corner-rush.php
 php tests/challenge-boundaries.php
+php tests/daily-boundaries.php
 php sim.php --rules=fruit-v2 --spins=100000 --seed=orchard-2026
 php sim.php --rules=fruit-v2 --runs=2000 --seed=orchard-2026
 node tests/reliable-actions.mjs
+node tests/challenges.mjs
 ```
 
-The HTTP checks use a separate local server at port 8766 with its own migrated QA database. They create disposable guests. See the [implementation record](docs/milestones.md) for legacy fixtures and [simulation report](docs/simulation.md) for measured returns and bonus pacing.
+The HTTP checks use a separate local server at port 8766 with its own migrated QA database. They create disposable guests. In the source checkout, see `docs/milestones.md` for browser commands, race checks and legacy fixtures. The [simulation report](docs/simulation.md) gives measured returns, bonus pacing and two Score Attack strategies.

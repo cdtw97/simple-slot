@@ -108,30 +108,30 @@ export function results(state, rules, announce) {
         stats.replaceChildren(stat('Potential score', money(pending.payoutUnits)));
     } else if (r) {
         strong = r.payoutUnits >= rules.celebrations.largeWinUnits && (!free || r.netUnits > 0);
-        title = r.triggered
-            ? 'Corner Rush unlocked!'
-            : r.bonusFinished
-              ? 'Corner Rush complete'
-              : strong
-                ? 'Big win!'
-                : r.payoutUnits > 0
-                  ? 'Fruit match'
-                  : 'No matches';
-        copy = r.triggered
-            ? 'All four corners are lit. Play your ' +
-              rules.bonusSpins +
-              ' free spins at ' +
-              rules.bonusMultiplier +
-              '×.'
-            : r.bonusFinished
-              ? 'Bonus total: ' + money(r.bonusTotalUnits) + '.'
-              : charge
-                ? count + ' of 4 corners lit. Your progress carries into the next spin.'
-                : r.kind === 'bonus'
-                  ? 'Corner Rush spin settled at ' + rules.bonusMultiplier + '×.'
-                  : r.payoutUnits
-                    ? 'Winning cells are marked on the reels.'
-                    : 'This board returned no award.';
+        title = r.payoutUnits ? 'Fruit match' : 'No matches';
+        copy = r.payoutUnits ? 'Winning cells are marked on the reels.' : 'This board returned no award.';
+        if (strong) title = 'Big win!';
+        if (r.kind === 'bonus') copy = 'Corner Rush spin settled at ' + rules.bonusMultiplier + '×.';
+        if (charge && state.phase !== 'run_complete')
+            copy = count + ' of 4 corners lit. Your progress carries into the next spin.';
+        if (r.triggered) {
+            title = 'Corner Rush unlocked!';
+            copy =
+                'All four corners charged. Play your ' +
+                rules.bonusSpins +
+                ' free spins at ' +
+                rules.bonusMultiplier +
+                '×.';
+        }
+        if (r.bonusFinished) {
+            title = 'Corner Rush complete';
+            copy = 'Bonus total: ' + money(r.bonusTotalUnits) + '.';
+        }
+        if (state.phase === 'run_complete') {
+            byId('lamp-copy').textContent =
+                'This run has ended. Your next run starts with four unlit corners.';
+            copy += ' Your scorecard is ready.';
+        }
         const rows = free
             ? [
                   stat('Spin cost', money(r.costUnits)),
@@ -161,6 +161,16 @@ export function results(state, rules, announce) {
 }
 export function help(rules, mode) {
     const extra = [];
+    if (mode === 'daily') {
+        extra.push(
+            element('h3', null, 'The daily challenge'),
+            element(
+                'p',
+                null,
+                'Everyone receives the same boards for the same choices on each date. The challenge changes at midnight in Toronto. Starting reserves your first attempt as official. You can finish it after midnight and play practice runs after your official attempt.',
+            ),
+        );
+    }
     if (rules.wild)
         extra.push(
             element('h3', null, 'Wild fruit'),

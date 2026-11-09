@@ -47,7 +47,7 @@ try {
     }
     $input = $method === 'POST' ? readAction() : null;
     $mode = $input['mode'] ?? $_GET['mode'] ?? 'free';
-    if (!in_array($mode, ['free', 'score'], true)) {
+    if (!in_array($mode, ['free', 'score', 'daily'], true)) {
         throw new GameError('invalid_mode', 'Choose an available game mode.', 422);
     }
     $secret = $_COOKIE['slot_guest'] ?? '';
