@@ -1,38 +1,13 @@
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {action, request, successful} from './api-client.mjs';
 
 // Run against an isolated test installation. Each execution creates two new test guests.
 const endpoint = process.argv[2] || 'http://127.0.0.1:8766/simple-slot/game.php';
 const secondWorker = process.argv[3] || endpoint;
 const jar = new Map();
 
-async function request(url, cookies, payload) {
-    const headers = {Cookie: [...cookies].map(([key, value]) => `${key}=${value}`).join('; ')};
-    if (payload) headers['Content-Type'] = 'application/json';
-    const response = await fetch(url, {
-        method: payload ? 'POST' : 'GET',
-        headers,
-        body: payload && JSON.stringify(payload),
-    });
-    for (const cookie of response.headers.getSetCookie()) {
-        const [pair] = cookie.split(';');
-        const index = pair.indexOf('=');
-        cookies.set(pair.slice(0, index), pair.slice(index + 1));
-    }
-    const body = await response.json();
-    return {status: response.status, ...body};
-}
-
-function successful(response) {
-    assert.equal(response.status, 200, JSON.stringify(response));
-    return response.state;
-}
-
 function spin(model) {
-    return {
-        mode: 'free', action: 'spin', csrf: model.csrf,
-        actionId: randomUUID(), expectedRevision: model.state.revision,
-    };
+    return action(model, 'spin');
 }
 
 const start = await request(endpoint, jar);

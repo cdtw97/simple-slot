@@ -45,3 +45,10 @@ The theoretical mean gross return on uniformly distributed legacy base spins is 
 Use the live evaluator and paytable as the historical regression reference. The old PHP simulator included its upper bound and ran 10,001 spins against a 10,000-spin denominator. Both simulators reported award-event counts as probabilities even though one spin could earn multiple awards. The Python evaluator also used the first matching row to label identical rows. One PHP evaluator for gameplay and simulation removes all three sources of drift.
 
 Keep authoritative board coordinates row-major and store one displayed credit as 100 integer units. Round half up once per individual award, then sum. Preserve the original payout examples PDF as historical material. Version any subsequent tuning separately and pin earned bonuses and finite runs to the rules under which they began.
+
+## Shared engine and durable Free Play
+
+- `php tests/engine.php` passed the legacy geometry, distinct coordinates, integer rounding, deterministic draw and simulator-parity fixtures.
+- `node tests/reliable-actions.mjs <test-api> <second-worker-api>` passed using two independent PHP 8.2.12 processes against one dedicated MariaDB test database. Two new actions at the same revision produced one successful commit. Retrying the committed ID recovered its original board. Changing that ID's payload was rejected; reloading preserved the balance, an intervening action and the isolated guest saves.
+- The same HTTP test played a naturally triggered bonus. On the two-worker run it took 19 additional normal spins to fill the lamps. Reading and retrying every bonus boundary preserved the three distinct payouts, final bonus total and normal-spin count.
+- `php tests/corner-rush.php` covered a row and diagonal touching one lamp, a below-cost pair completing all lamps, a 3.15-credit wallet entering the earned bonus, a natural four-corner award and a bonus result that would otherwise fill all lamps. Reset and normal-spin requests during the queue were rejected. The controlled bonus returned 410.00 exactly.
