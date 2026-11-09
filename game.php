@@ -23,6 +23,22 @@ function readAction(): array
     return $action;
 }
 
+function publicRules(string $version): array
+{
+    $rules = Rules::get($version);
+    foreach ($rules['symbols'] as $symbol => $metadata) {
+        $tier = $metadata['tier'];
+        if (isset($rules['paytableUnits'][$tier]) || $symbol === 'wild') continue;
+        foreach ($rules['paytableBps'][$tier]['row'] as $length => $value) {
+            $rules['paytableUnits'][$tier]['row'][$length] = Engine::payoutUnits($rules, $symbol, 'row', $length);
+        }
+        foreach (['diagonal' => 3, 'corners' => 4] as $type => $length) {
+            $rules['paytableUnits'][$tier][$type] = Engine::payoutUnits($rules, $symbol, $type, $length);
+        }
+    }
+    return $rules;
+}
+
 try {
     $method = $_SERVER['REQUEST_METHOD'] ?? '';
     if (!in_array($method, ['GET', 'POST'], true)) {
@@ -31,7 +47,7 @@ try {
     }
     $input = $method === 'POST' ? readAction() : null;
     $mode = $input['mode'] ?? $_GET['mode'] ?? 'free';
-    if (!in_array($mode, ['free'], true)) {
+    if (!in_array($mode, ['free', 'score'], true)) {
         throw new GameError('invalid_mode', 'Choose an available game mode.', 422);
     }
     $secret = $_COOKIE['slot_guest'] ?? '';
@@ -57,18 +73,12 @@ try {
         setcookie('slot_guest', $secret, ['expires' => time() + 365 * 86400, 'path' => $path . '/',
             'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off', 'httponly' => true, 'samesite' => 'Lax']);
     }
-    $rules = Rules::get($response['state']['rulesVersion']);
-    foreach ($rules['symbols'] as $symbol => $metadata) {
-        $tier = $metadata['tier'];
-        if (isset($rules['paytableUnits'][$tier]) || $symbol === 'wild') continue;
-        foreach ($rules['paytableBps'][$tier]['row'] as $length => $value) {
-            $rules['paytableUnits'][$tier]['row'][$length] = Engine::payoutUnits($rules, $symbol, 'row', $length);
-        }
-        foreach (['diagonal' => 3, 'corners' => 4] as $type => $length) {
-            $rules['paytableUnits'][$tier][$type] = Engine::payoutUnits($rules, $symbol, $type, $length);
-        }
+    $state = $response['state'];
+    $response['rules'] = publicRules($state['rulesVersion']);
+    if ($mode === 'free' && $state['phase'] === 'idle' && $state['rulesVersion'] !== Rules::CURRENT) {
+        $response['nextRules'] = publicRules(Rules::CURRENT);
     }
-    echo json_encode($response + ['rules' => $rules, 'csrf' => $csrf], JSON_THROW_ON_ERROR);
+    echo json_encode($response + ['csrf' => $csrf], JSON_THROW_ON_ERROR);
 } catch (GameError $e) {
     http_response_code($e->status);
     echo json_encode(['error' => ['code' => $e->reason, 'message' => $e->getMessage()]]);
@@ -77,3 +87,4 @@ try {
     http_response_code(503);
     echo json_encode(['error' => ['code' => 'unavailable', 'message' => 'The game could not reach your save. Reconnect and retry.']]);
 }
+

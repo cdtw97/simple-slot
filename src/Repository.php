@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/GameState.php';
+require_once __DIR__ . '/Collection.php';
 
 final class Repository
 {
@@ -25,6 +26,71 @@ final class Repository
         return $s;
     }
 
+    private function profile(int $id, string $json): array
+    {
+        $stored = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        $profile = Collection::upgrade($stored);
+        if (!isset($stored['version'])) {
+            // R1 retained exactly one receipt per spin. Derive collection history once
+            // without replaying any wallet, lamp or bonus mutations.
+            $receipts = $this->query('SELECT receipt_json FROM slot_actions WHERE guest_id=?', [$id]);
+            while (($json = $receipts->fetchColumn()) !== false) {
+                $old = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+                if ($old['mode'] === 'free' && $old['result']) {
+                    Collection::apply($profile, $old);
+                }
+            }
+            $this->query('UPDATE slot_guests SET profile_json=? WHERE id=?', [json_encode($profile, JSON_THROW_ON_ERROR), $id]);
+        }
+        return $profile;
+    }
+
+    private function finishRun(int $guest, array &$game): void
+    {
+        $date = $game['dailyDate'] ?? '';
+        $official = $game['official'] ?? true;
+        $params = [$guest, $game['mode'], 'fruit-arcade', $game['rulesVersion'], $date];
+        $best = $this->query('SELECT MAX(score_units) FROM slot_records
+            WHERE guest_id=? AND mode=? AND machine=? AND rules_version=? AND daily_key=? AND official=1', $params)->fetchColumn();
+        $game['record'] = $game['runStats'] + [
+            'id' => $game['id'], 'mode' => $game['mode'], 'machine' => 'fruit-arcade',
+            'rulesVersion' => $game['rulesVersion'], 'scoreUnits' => $game['scoreUnits'],
+            'dailyDate' => $date ?: null, 'official' => $official,
+            'previousBestUnits' => $best !== null ? (int)$best : null,
+        ];
+        if ($official) {
+            $this->query('INSERT INTO slot_records
+                (run_id,guest_id,mode,machine,rules_version,daily_key,official,score_units,record_json)
+                VALUES (?,?,?,?,?,?,?,?,?)', array_merge([$game['id']], $params, [1, $game['scoreUnits'], json_encode($game['record'], JSON_THROW_ON_ERROR)]));
+        }
+    }
+
+    private function act(int $id, array &$state, array &$profile, array $input): void
+    {
+        $action = $input['action'];
+        if ($action === 'equip') {
+            Collection::equip($profile, $input['palette'] ?? null);
+            return;
+        }
+        $before = $state['result']['id'] ?? null;
+        if ($state['mode'] === 'free') {
+            if ($state['phase'] === 'idle') {
+                // All supported versions share corner positions; retain charged lamps on upgrade.
+                $state['rulesVersion'] = Rules::CURRENT;
+            }
+            GameState::act($state, $action, $input, Rules::get($state['rulesVersion']));
+        } else {
+            $version = $action === 'start_run' ? Rules::CURRENT : $state['rulesVersion'];
+            Challenge::act($state, $action, $input, Rules::get($version));
+        }
+        if ($state['result'] && $state['result']['id'] !== $before) {
+            Collection::apply($profile, $state);
+            if ($state['phase'] === 'run_complete') {
+                $this->finishRun($id, $state);
+            }
+        }
+    }
+
     public function load(string $hash, string $mode, ?array $input, ?int $legacyWallet): array
     {
         $this->db->beginTransaction();
@@ -39,7 +105,11 @@ final class Repository
                 throw new GameError('unknown_guest', 'Reconnect to load your guest save.', 403);
             }
             $id = (int)$guest['id'];
-            $profile = json_decode($guest['profile_json'], true, 512, JSON_THROW_ON_ERROR);
+            $profile = $this->profile($id, $guest['profile_json']);
+            if ($legacyWallet !== null && $mode !== 'free') {
+                $this->query("INSERT INTO slot_games (guest_id,mode,state_json) VALUES (?,'free',?)
+                    ON DUPLICATE KEY UPDATE guest_id=guest_id", [$id, json_encode(GameState::initial('free', $legacyWallet), JSON_THROW_ON_ERROR)]);
+            }
             $stored = $this->query('SELECT state_json FROM slot_games WHERE guest_id=? AND mode=?', [$id, $mode])->fetchColumn();
             $state = $stored ? json_decode($stored, true, 512, JSON_THROW_ON_ERROR) : GameState::initial($mode, $legacyWallet);
             $replayed = false;
@@ -60,12 +130,9 @@ final class Repository
                     if ($state['revision'] !== $input['expectedRevision']) {
                         throw new GameError('stale_revision', 'This game changed in another tab. Reload its latest result.');
                     }
-                    if ($mode === 'free' && $state['phase'] === 'idle') {
-                        // All supported versions share corner positions; retain charged lamps on upgrade.
-                        $state['rulesVersion'] = Rules::CURRENT;
-                    }
-                    GameState::act($state, $input['action'], $input, Rules::get($state['rulesVersion']));
+                    $this->act($id, $state, $profile, $input);
                     $state['revision']++;
+                    $this->query('UPDATE slot_guests SET profile_json=? WHERE id=?', [json_encode($profile, JSON_THROW_ON_ERROR), $id]);
                     $this->query('INSERT INTO slot_actions (guest_id,action_id,payload_hash,receipt_json) VALUES (?,?,?,?)',
                         [$id, $input['actionId'], $digest, json_encode($state, JSON_THROW_ON_ERROR)]);
                 }
@@ -75,7 +142,7 @@ final class Repository
                     ON DUPLICATE KEY UPDATE state_json=VALUES(state_json)', [$id, $mode, json_encode($state, JSON_THROW_ON_ERROR)]);
             }
             $this->db->commit();
-            return ['state' => $state, 'profile' => (object)$profile, 'daily' => null, 'replayed' => $replayed];
+            return ['state' => $state, 'profile' => Collection::view($profile), 'daily' => null, 'replayed' => $replayed];
         } catch (Throwable $e) {
             $this->db->rollBack();
             throw $e;

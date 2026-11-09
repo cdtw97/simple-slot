@@ -24,7 +24,8 @@ function cabinetFruit(string $id): string {
 <header class="site-head"><div class="wrap head-inner">
     <a class="wordmark" href="./" aria-label="CDTW Games home"><img src="assets/mark.svg" width="35" height="35" alt="">CDTW<span>GAMES</span></a>
     <nav aria-label="Game tools">
-        <button id="guide-button" class="nav-button"><?= icon('book') ?><span>How to play</span></button>
+        <button id="collection-button" class="nav-button" aria-label="Collection" disabled><?= icon('trophy') ?><span>Collection</span></button>
+        <button id="guide-button" class="nav-button" aria-label="How to play"><?= icon('book') ?><span>How to play</span></button>
         <button id="mute-button" class="icon-button" aria-label="Mute sound" aria-pressed="false"><?= icon('volume') ?></button>
         <button id="settings-button" class="icon-button" aria-label="Settings"><?= icon('settings') ?></button>
     </nav>
@@ -33,7 +34,9 @@ function cabinetFruit(string $id): string {
     <div class="game-heading"><div>
         <h1>Simple Slot<span class="title-dot">.</span></h1>
         <p>Match fruit across six reels. Light all four corners for a bonus.</p>
-    </div><div id="mode-control" class="mode-control"><span class="mode-dot"></span> Free Play</div></div>
+    </div><label id="mode-control" class="mode-control"><span class="mode-dot"></span>
+        <select id="mode" aria-label="Game mode"><option value="free">Free Play</option><option value="score">Score Attack</option></select><?= icon('chevron') ?>
+    </label></div>
     <p id="notice" class="notice" role="status" hidden></p>
     <div class="layout">
         <div>

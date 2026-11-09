@@ -52,3 +52,13 @@ Keep authoritative board coordinates row-major and store one displayed credit as
 - `node tests/reliable-actions.mjs <test-api> <second-worker-api>` passed using two independent PHP 8.2.12 processes against one dedicated MariaDB test database. Two new actions at the same revision produced one successful commit. Retrying the committed ID recovered its original board. Changing that ID's payload was rejected; reloading preserved the balance, an intervening action and the isolated guest saves.
 - The same HTTP test played a naturally triggered bonus. On the two-worker run it took 19 additional normal spins to fill the lamps. Reading and retrying every bonus boundary preserved the three distinct payouts, final bonus total and normal-spin count.
 - `php tests/corner-rush.php` covered a row and diagonal touching one lamp, a below-cost pair completing all lamps, a 3.15-credit wallet entering the earned bonus, a natural four-corner award and a bonus result that would otherwise fill all lamps. Reset and normal-spin requests during the queue were rejected. The controlled bonus returned 410.00 exactly.
+
+## Release 1 · Fruit Arcade
+
+The playable cabinet uses original local fruit artwork, persistent preferences and the server's cell coordinates for every winning pattern. The measured settings and seeded sample are in [simulation.md](simulation.md).
+
+Ran `node tests/browser.mjs http://127.0.0.1:8766/simple-slot/` with Playwright Core and Chrome 156.0.8078.81. The harness accepts the browser executable in `SLOT_BROWSER`, the installed Playwright Core package path in `SLOT_PLAYWRIGHT` and an optional screenshot directory in `SLOT_SCREENSHOTS`. It uses disposable guest cookies against a test install.
+
+The desktop (1440×960), narrow phone (320×740), landscape (844×390) and tablet (768×1024) checks each displayed all 18 symbols in six aligned columns. The narrow view initially cropped the third row. Explicit grid track sizing fixed it and all four sizes passed on rerun. The browser used emulated touch. Desktop and phone screenshots received a visual check; physical iOS/Android hardware was not exercised.
+
+Dialog use, keyboard spin, repeated taps during a slow request, rotation while spinning and reveal produced exactly one action. The visible wallet, paid cells and restored result matched the server. A dropped response after a committed spin, followed by another tab's spin and a retry, kept the newer result and wallet. A stale request explained the other-tab update and recovered the current board.

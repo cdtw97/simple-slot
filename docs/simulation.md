@@ -33,3 +33,40 @@ In this sample the meter filled in 18 normal spins at the median, 8 at the 10th 
 ## Repeatable draws
 
 Ordinary non-seeded gameplay uses PHP's `random_int`. For seeded draws, `Engine::stream` takes a seed and a context string. The input to HMAC-SHA256 is PHP's JSON encoding of the two-element list containing that context and an integer block counter starting at zero. Each digest supplies eight unsigned big-endian 32-bit words in order. Rejection sampling discards words in the incomplete top bucket before reducing modulo the sum of configured weights. Normal boards fill in row-major order and replacement reels fill top to bottom. Contexts must include the action-specific draw address when requesting independent boards.
+
+## Tier and wild tuning
+
+```sh
+php sim.php --rules=fruit-v2 --spins=100000 --seed=orchard-2026
+php sim.php --rules=fruit-v2 --runs=2000 --seed=orchard-2026
+```
+
+The weighted reel contains 88 tickets, including a single wild. Each common fruit has 10 tickets, each medium fruit has 8 and each premium fruit has 5. A six-fruit row returns 65.00, 100.00 or 200.00 credits by tier, up from 50.00 for all fruits in fruit-v1. The canonical tie-break compares wild assignments from left to right using the original fruit order of apple, orange, lemon, watermelon, grape, cherry, pear, pineapple, coconut, kiwi and strawberry.
+
+The first candidate paid 2.25/2.85/4.25 credits for pairs and 5.00/6.25/10.00 for triples and diagonals. Across 100,000 normal boards with seed `orchard-2026`, it returned 142.51% of normal stakes including its free spins. Frequent short matches accounted for most awards. The shipped fruit-v2 reduces the three pair awards to 1.80/2.25/3.40 and the three triple/diagonal awards to 4.50/5.75/9.25, preserving the larger returns for long patterns.
+
+| Free Play measure | fruit-v1 | fruit-v2 |
+| --- | ---: | ---: |
+| Normal boards with awards | 77.70% | 83.55% |
+| Normal boards with net gains | 43.78% | 35.07% |
+| Median normal-spin award | 3.15 | 3.60 |
+| Normal-spin award at p95 / p99 | 11.70 / 14.85 | 11.50 / 16.80 |
+| Corner Rush activations | 4,921 | 6,155 |
+| Normal spins between activations at p10 / median / p90 | 8 / 18 / 35 | 7 / 15 / 28 |
+| Bonus spins completed | 14,763 | 18,465 |
+| Bonus share of all awards | 22.99% | 26.90% |
+| All awards divided by normal stakes | 118.02% | 118.59% |
+
+The Score Attack command drives the production challenge state machine through all choices and earned bonuses. Both strategies draw the same 60,000 normal boards across 2,000 paired 30-spin runs. Each run, normal index, bonus ordinal and respin reel selects its own stream. The reroll strategy uses its two available charges on the third reel at the first two zero-return previews. All other previews are kept.
+
+| Score Attack measure | Keep all | Reroll zeros |
+| --- | ---: | ---: |
+| Mean final score | 170.21 | 173.59 |
+| 10th percentile | 126.25 | 128.90 |
+| Median | 166.60 | 170.05 |
+| 90th percentile | 217.65 | 221.75 |
+| 99th percentile | 269.40 | 275.10 |
+| Corner Rush activations | 3,092 | 3,099 |
+| Respins consumed | 0 | 3,937 |
+
+The reroll strategy gained 3.38 points on average across this sample. These two straightforward strategies measure the effect of a specific decision rule; other choices can improve or discard a pending award.

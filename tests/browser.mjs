@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -89,6 +90,7 @@ try {
     releaseRequest();
     await page.waitForFunction(() => /reveal|skip/i.test(document.querySelector('#spin-button').innerText));
     assert.equal(await wallet.innerText(), walletText);
+    await page.setViewportSize({width: 390, height: 844});
     await button.click();
     await page.waitForFunction(() => !/reveal|skip|loading|spinning/i.test(document.querySelector('#spin-button').innerText)
         && !document.querySelector('#spin-button').disabled);
@@ -111,9 +113,45 @@ try {
     await page.locator('#spin-button:enabled').waitFor();
     assert.deepEqual(await getState(), result);
     assert.equal(posts, 1);
+
+    // Lose the actual server response after commit, then play from another tab before retry.
+    let dropped;
+    await page.route('**/game.php*', async route => {
+        if (route.request().method() === 'POST' && !dropped) {
+            dropped = route.request().postDataJSON();
+            const committed = await route.fetch();
+            assert.equal(committed.status(), 200);
+            await route.abort('failed');
+        } else await route.continue();
+    });
+    await button.click();
+    await page.locator('#spin-button[data-action=retry]').waitFor();
+    const interrupted = await getState();
+    assert.equal(interrupted.revision, result.revision + 1);
+    const otherTabSpin = async () => {
+        const data = await (await context.request.get(api)).json();
+        const command = {mode: 'free', action: data.state.bonusRemaining ? 'advance_bonus' : 'spin',
+            expectedRevision: data.state.revision, csrf: data.csrf, actionId: randomUUID()};
+        const next = await context.request.post(api, {data: command});
+        assert.equal(next.status(), 200);
+        return (await next.json()).state;
+    };
+    const newer = await otherTabSpin();
+    const repeat = page.waitForRequest(req => req.method() === 'POST');
+    await button.click();
+    assert.deepEqual((await repeat).postDataJSON(), dropped, 'retry changed the original action');
+    await page.locator('#spin-button:is([data-action=spin],[data-action=advance_bonus])').waitFor();
+    assert.deepEqual(await getState(), newer);
+    assert.equal(Number((await wallet.innerText()).replace(/[^\d.]/g, '')), newer.walletUnits / 100);
+    await page.unroute('**/game.php*');
+    const unseen = await otherTabSpin();
+    await button.click();
+    await page.waitForFunction(() => /another tab/i.test(document.querySelector('#notice').innerText));
+    assert.deepEqual(await getState(), unseen);
+    assert.equal(Number((await wallet.innerText()).replace(/[^\d.]/g, '')), unseen.walletUnits / 100);
     assert.ok(initialButtonText.trim().length);
     assert.deepEqual(exceptions, []);
-    console.log('Passed desktop, 320px touch, landscape, tablet, reel alignment, dialogs, keyboard spin, slow-request tap lock, reveal, wallet settlement and refresh in ' + await browser.version());
+    console.log('Passed desktop, 320px touch, landscape, tablet, alignment, dialogs, keyboard spin, slow requests, rotate/reveal, wallet, exact highlights, reload, lost-response retry, late receipt and stale-tab recovery in ' + await browser.version());
 } finally {
     await browser.close();
 }

@@ -75,6 +75,62 @@ final class Engine
         ];
     }
 
+    private static function rowAwards(array $row, array $original, int $r, array $rules, int $multiplier): array
+    {
+        $awards = [];
+        for ($start = 0; $start < count($row); $start = $end) {
+            $symbol = $row[$start];
+            $end = $start + 1;
+            while ($end < count($row) && $row[$end] === $symbol) {
+                $end++;
+            }
+            $length = $end - $start;
+            if ($length < $rules['patterns']['minRow']
+                || !in_array($symbol, array_slice($original, $start, $length), true)) {
+                continue;
+            }
+            $cells = [];
+            for ($c = $start; $c < $end; $c++) {
+                $cells[] = [$r, $c];
+            }
+            $awards[] = self::award($rules, 'row', $symbol, $cells, $multiplier);
+        }
+        return $awards;
+    }
+
+    private static function bestRow(array $row, int $r, array $rules, int $multiplier): array
+    {
+        $wild = $rules['wild'];
+        $wildColumns = array_keys($row, $wild, true);
+        if (!$wildColumns) {
+            return self::rowAwards($row, $row, $r, $rules, $multiplier);
+        }
+        // The registry's symbol order and left-to-right wild positions define the tie-break.
+        $fruits = array_intersect(array_keys($rules['symbols']), array_diff($row, [$wild]));
+        $candidates = [$row];
+        foreach ($wildColumns as $c) {
+            $expanded = [];
+            foreach ($candidates as $candidate) {
+                foreach ($fruits as $fruit) {
+                    $candidate[$c] = $fruit;
+                    $expanded[] = $candidate;
+                }
+            }
+            $candidates = $expanded;
+        }
+        $best = [];
+        $highest = -1;
+        foreach ($candidates as $candidate) {
+            $awards = self::rowAwards($candidate, $row, $r, $rules, $multiplier);
+            $total = array_sum(array_column($awards, 'payoutUnits'));
+            if ($total > $highest) {
+                $highest = $total;
+                $best = $awards;
+            }
+        }
+        return $best;
+    }
+
     public static function evaluate(array $board, array $rules, int $multiplier = 1): array
     {
         if (!array_is_list($board) || count($board) !== $rules['rows'] || $multiplier < 1) {
@@ -90,31 +146,25 @@ final class Engine
                     throw new InvalidArgumentException('Unrecognized board symbol.');
                 }
             }
-            for ($start = 0; $start < count($row); $start = $end) {
-                $end = $start + 1;
-                while ($end < count($row) && $row[$end] === $row[$start]) {
-                    $end++;
-                }
-                if ($end - $start >= $rules['patterns']['minRow']) {
-                    $cells = [];
-                    for ($c = $start; $c < $end; $c++) {
-                        $cells[] = [$r, $c];
-                    }
-                    $awards[] = self::award($rules, 'row', $row[$start], $cells, $multiplier);
-                }
-            }
+            array_push($awards, ...self::bestRow($row, $r, $rules, $multiplier));
         }
         $groups = ['diagonal'=>$rules['patterns']['diagonals'], 'corners'=>[$rules['patterns']['corners']]];
         foreach ($groups as $type => $patterns) {
             foreach ($patterns as $cells) {
-                [$r, $c] = $cells[0];
-                $symbol = $board[$r][$c];
+                $symbol = null;
                 foreach ($cells as [$r, $c]) {
-                    if ($board[$r][$c] !== $symbol) {
+                    $cell = $board[$r][$c];
+                    if ($cell === $rules['wild']) {
+                        continue;
+                    }
+                    $symbol ??= $cell;
+                    if ($cell !== $symbol) {
                         continue 2;
                     }
                 }
-                $awards[] = self::award($rules, $type, $symbol, $cells, $multiplier);
+                if ($symbol !== null) {
+                    $awards[] = self::award($rules, $type, $symbol, $cells, $multiplier);
+                }
             }
         }
         return ['awards'=>$awards, 'payoutUnits'=>array_sum(array_column($awards, 'payoutUnits'))];

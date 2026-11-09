@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/Engine.php';
+require_once __DIR__ . '/Challenge.php';
 
 final class GameError extends RuntimeException
 {

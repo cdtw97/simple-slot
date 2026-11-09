@@ -10,4 +10,12 @@
 <symbol id="coconut" viewBox="0 0 80 80"><g stroke="#403829" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 33Q10 55 23 65Q41 80 58 64Q68 53 67 35L56 25Z" fill="#996c4b" /><path d="M18 48l5 10m3-5 4 9m28-15-5 10" fill="none" stroke="#684c3a" stroke-width="2"/><path d="M12 37C10 22 23 13 41 13C58 12 72 20 70 33C69 46 53 55 34 53Q16 52 12 37Z" fill="#bd9467" /><path d="M17 35C16 24 27 18 42 17C57 17 66 23 65 32C63 43 50 48 35 48Q21 47 17 35Z" fill="#ffecd2" /><path d="M23 34C22 27 31 22 42 22Q55 21 60 29Q45 22 23 34Z" fill="#d4bf9c" stroke="none"/></g></symbol>
 <symbol id="kiwi" viewBox="0 0 80 80"><g stroke="#403829" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 29Q21 12 39 10Q57 7 67 23Q78 43 62 57L40 68Q15 66 12 47Z" fill="#9a7750" /><path d="M48 14l3 2m6 2 2 3m5 4 2 4m2 8-1 4" fill="none" stroke="#69563d" stroke-width="2"/><path d="M9 49C8 34 23 21 38 20C56 17 67 28 65 43C63 58 49 71 33 72Q11 74 9 49Z" fill="#b2945d" /><path d="M14 48C13 36 25 26 39 25C53 23 62 30 60 42Q57 62 37 66Q15 71 14 48Z" fill="#94bb53" /><path d="M28 49Q30 38 40 37Q48 37 46 45Q42 55 34 56Q27 57 28 49Z" fill="#e7df90" stroke="none"/><path d="M25 52l-3 2m4-10-3-1m10-6-1-3m9 0 1-3m6 7 3-2m-2 10 3 1m-12 8 1 3m-9-2-2 3" fill="none" stroke="#4d5332" stroke-width="2.5"/></g></symbol>
 <symbol id="strawberry" viewBox="0 0 80 80"><g stroke="#403829" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M18 30C24 21 36 23 40 25C53 19 65 22 68 35Q72 50 48 68Q39 77 31 68Q9 47 18 30Z" fill="#ed6054" /><path d="M64 31Q73 47 48 66Q41 72 37 70Q58 52 64 31Z" fill="#cb4945" stroke="none"/><path d="M39 25L24 17L36 17L32 9L43 16L49 5L51 17L62 14L55 22L62 26L48 26L39 33Z" fill="#69a361" /><path d="M24 36l1 3m10-4 1 3m12-6-1 3m10 0-1 3m-31 5 2 3m10-4v3m10-5-1 3m-12 9 1 3m12-4-1 2m-6 6-1 2" fill="none" stroke="#ffe5a9" stroke-width="2.5"/></g></symbol>
+<symbol id="wild" viewBox="0 0 80 80">
+  <g stroke-linejoin="round" stroke-linecap="round">
+    <path d="M37 11Q40 4 44 11L51 24 67 27Q75 29 69 36L59 47 61 64Q62 71 55 68L40 61 25 69Q17 71 19 63L21 47 10 36Q5 30 13 27L29 24Z" fill="#f9bd45" stroke="#46382d" stroke-width="3"/>
+    <path d="M57 47L59 62Q60 67 56 65L40 58 24 66 25 62 40 54 54 60Z" fill="#df9233"/>
+    <path d="M15 31L31 28 39 14" fill="none" stroke="#fff0ae" stroke-width="4"/>
+    <path d="M23 35h6l3 12 5-14h6l4 14 4-12h6l-7 19h-6l-4-12-5 12h-6Z" fill="#664632" stroke="#55412e" stroke-width="1.1"/>
+  </g>
+</symbol>
 </svg>

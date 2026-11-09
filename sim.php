@@ -92,14 +92,61 @@ function simulate(array $rules, int $count, string $seed): array
     ];
 }
 
+/** Compare choices on paired normal boards, with independent draws for each bonus and respin. */
+function simulateRuns(array $rules, int $count, string $seed, bool $rerollBlanks): array
+{
+    require_once __DIR__ . '/src/GameState.php';
+    $scores = [];
+    $scoreTotal = $respins = $bonuses = $normalSpins = $bonusSpins = 0;
+    for ($run = 1; $run <= $count; $run++) {
+        $game = GameState::initial('score');
+        Challenge::act($game, 'start_run', [], $rules);
+        while ($game['phase'] !== 'run_complete') {
+            $spin = $game['normalUsed'];
+            $input = [];
+            $ordinal = null;
+            if ($game['bonusRemaining']) {
+                $action = 'advance_bonus';
+                $ordinal = $rules['bonusSpins'] - $game['bonusRemaining'] + 1;
+                $bonusSpins++;
+            } elseif ($game['phase'] === 'awaiting_choice') {
+                $action = 'keep';
+                if ($rerollBlanks && $game['pending']['payoutUnits'] === 0) {
+                    $action = 'respin';
+                    $input = ['reel'=>2];
+                }
+            } else {
+                $action = 'spin';
+                $spin++;
+            }
+            $address = ['score', $rules['version'], $run, $action, $spin, $input['reel'] ?? null, $ordinal];
+            Challenge::act($game, $action, $input, $rules, Engine::stream($seed, json_encode($address, JSON_THROW_ON_ERROR)));
+        }
+        $score = $game['scoreUnits'];
+        $scores[$score] = ($scores[$score] ?? 0) + 1;
+        $scoreTotal += $score;
+        $normalSpins += $game['normalUsed'];
+        $respins += $game['runStats']['respinsUsed'];
+        $bonuses += $game['runStats']['bonuses'];
+    }
+    return [
+        'strategy'=>$rerollBlanks ? 'respin reel three on the first two zero-return previews' : 'keep every board',
+        'completedRuns'=>$count, 'normalSpins'=>$normalSpins, 'bonusSpins'=>$bonusSpins,
+        'cornerRushActivations'=>$bonuses, 'respinsUsed'=>$respins,
+        'meanScoreUnits'=>$scoreTotal / $count, 'scoreUnitsPercentiles'=>percentiles($scores),
+    ];
+}
+
 try {
-    $args = getopt('', ['rules:', 'spins:', 'seed:', 'board:', 'multiplier:', 'help']);
+    $args = getopt('', ['rules:', 'spins:', 'runs:', 'seed:', 'board:', 'multiplier:', 'help']);
     if (isset($args['help'])) {
-        echo "php sim.php [--rules=fruit-v1] [--spins=10000] [--seed=orchard-2026]\n";
+        echo "php sim.php [--rules=fruit-v2] [--spins=10000] [--seed=orchard-2026]\n";
+        echo "php sim.php --runs=1000 [--rules=fruit-v2] [--seed=orchard-2026]\n";
         echo "php sim.php --board=FILE_OR_- [--rules=legacy-v1] [--multiplier=1]\n";
         exit;
     }
     $rules = Rules::get($args['rules'] ?? null);
+    $seed = $args['seed'] ?? $rules['simulation']['seed'];
     if (isset($args['board'])) {
         $path = $args['board'] === '-' ? 'php://stdin' : $args['board'];
         $board = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
@@ -108,12 +155,20 @@ try {
             throw new InvalidArgumentException('Choose a multiplier of 1 or 2.');
         }
         $report = Engine::evaluate($board, $rules, $multiplier);
+    } elseif (isset($args['runs'])) {
+        $count = filter_var($args['runs'], FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if (!$count || $rules['version'] !== 'fruit-v2') {
+            throw new InvalidArgumentException('Use a positive run count and a rules version supporting Score Attack (fruit-v2).');
+        }
+        $report = ['rulesVersion'=>$rules['version'], 'seed'=>$seed, 'pairedStrategies'=>[
+            simulateRuns($rules, $count, $seed, false), simulateRuns($rules, $count, $seed, true),
+        ]];
     } else {
         $count = filter_var($args['spins'] ?? $rules['simulation']['normalSpins'], FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
         if (!$count) {
             throw new InvalidArgumentException('Use a positive integer number of spins.');
         }
-        $report = simulate($rules, $count, $args['seed'] ?? $rules['simulation']['seed']);
+        $report = simulate($rules, $count, $seed);
     }
     echo json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;
 } catch (Throwable $error) {
