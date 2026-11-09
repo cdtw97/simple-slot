@@ -1,0 +1,6 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?:config|docs|migrations|scripts|src|tests|dist|\.git)(?:/|$) - [F,NC]
+  RewriteRule ^(?:sim\.(?:php|py)|SIMPLE_SLOT_CODEX_ROADMAP\.txt)$ - [F,NC]
+</IfModule>
